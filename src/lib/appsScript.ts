@@ -6,21 +6,7 @@
  * Apps Script necesario: ver /scripts/drive-upload.gs
  */
 
-export async function uploadComprobante(file: File): Promise<string> {
-  const scriptUrl = process.env.GOOGLE_APPS_SCRIPT_URL;
-  if (!scriptUrl) throw new Error("Falta GOOGLE_APPS_SCRIPT_URL en .env.local");
-
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const base64 = buffer.toString("base64");
-
-  const body = JSON.stringify({
-    base64,
-    mimeType: file.type || "application/octet-stream",
-    filename: `${Date.now()}_${file.name}`,
-  });
-
-  // Apps Script devuelve 302 al "echo URL". redirect:"follow" convierte POST→GET,
-  // pero necesitamos seguir manualmente para conservar los headers correctos.
+async function intentarUpload(scriptUrl: string, body: string): Promise<string> {
   let res = await fetch(scriptUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -33,7 +19,6 @@ export async function uploadComprobante(file: File): Promise<string> {
     if (!location) throw new Error("Apps Script 302 sin Location header");
     res = await fetch(location, { redirect: "manual" });
 
-    // El echo URL puede tener una segunda redirección
     if (res.status === 302 || res.status === 301 || res.status === 303) {
       const location2 = res.headers.get("location");
       if (!location2) throw new Error("Apps Script echo 302 sin Location header");
@@ -49,4 +34,30 @@ export async function uploadComprobante(file: File): Promise<string> {
   const data = (await res.json()) as { ok: boolean; url?: string; error?: string };
   if (!data.ok) throw new Error(data.error ?? "Error en Apps Script");
   return data.url!;
+}
+
+export async function uploadComprobante(file: File): Promise<string> {
+  const scriptUrl = process.env.GOOGLE_APPS_SCRIPT_URL;
+  if (!scriptUrl) throw new Error("Falta GOOGLE_APPS_SCRIPT_URL en .env.local");
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const base64 = buffer.toString("base64");
+
+  const body = JSON.stringify({
+    base64,
+    mimeType: file.type || "application/octet-stream",
+    filename: `${Date.now()}_${file.name}`,
+  });
+
+  // Hasta 3 intentos con 1.5s de espera entre cada uno (el 404 de Apps Script es intermitente)
+  let lastError: Error = new Error("Sin intentos");
+  for (let intento = 1; intento <= 3; intento++) {
+    try {
+      return await intentarUpload(scriptUrl, body);
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (intento < 3) await new Promise((r) => setTimeout(r, 1500));
+    }
+  }
+  throw lastError;
 }
