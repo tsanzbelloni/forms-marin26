@@ -6,10 +6,10 @@ import {
   Check,
   ChevronLeft,
   Copy,
-  ExternalLink,
   MapPin,
   Minus,
   Plus,
+  Ticket,
   Upload,
 } from "lucide-react";
 
@@ -42,6 +42,7 @@ async function comprimirImagen(file: File, maxPx = 1600, quality = 0.82): Promis
 const PRECIO_ENTRADA = 12000;
 const ALIAS_PAGO = process.env.NEXT_PUBLIC_ALIAS_PAGO ?? "ALIAS.GRUPO.MISIONERO";
 const MAPS_URL = "https://maps.app.goo.gl/XdfyYyUC42b3sLhH8";
+const CIERRE = new Date("2026-09-19T12:00:00-03:00");
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -50,6 +51,114 @@ type Paso = "info" | "entradas" | "nombres" | "pago" | "exito";
 interface Entrada {
   nombre: string;
   apellido: string;
+}
+
+// ─── Pantalla cerrada ──────────────────────────────────────────────────────────
+
+function PantallaCerrada() {
+  return (
+    <div className="step-content flex flex-col items-center text-center">
+      {/* Badge */}
+      <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white/80 backdrop-blur-sm">
+        19 de septiembre · 20 hs
+      </div>
+
+      {/* Logo */}
+      <div className="mb-6 flex items-center justify-center">
+        <Image
+          src="/logo.png"
+          alt="Grupo Misionero San Juan Pablo II"
+          width={160}
+          height={160}
+          className="opacity-90"
+          style={{ objectFit: "contain", maxHeight: 140 }}
+          priority
+        />
+      </div>
+
+      <h1
+        className="text-4xl font-bold text-white md:text-5xl"
+        style={{ letterSpacing: "-0.03em", lineHeight: 1.1 }}
+      >
+        Gracias por
+        <br />
+        tu entrada
+      </h1>
+
+      <p className="mt-4 text-sm font-semibold uppercase tracking-[0.2em] text-white/50">
+        Grupo Misionero San Juan Pablo II
+      </p>
+
+      {/* Card info */}
+      <div className="mt-8 w-full max-w-xs rounded-2xl border border-white/10 bg-white/7 px-5 py-5 text-left space-y-3">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/40">
+          El evento
+        </p>
+        <div>
+          <p className="text-base font-bold text-white/90">
+            Peña Folklórica
+          </p>
+          <p className="mt-1 text-sm text-white/65">
+            Viernes 19 de septiembre · 20 hs
+          </p>
+        </div>
+        <a
+          href={MAPS_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-start gap-2 hover:underline"
+          style={{ color: "#d4aa4a" }}
+        >
+          <MapPin size={13} className="shrink-0 mt-0.5" />
+          <span className="text-sm">Av. del Libertador 17115, B1643 Beccar</span>
+        </a>
+      </div>
+
+      {/* Mensaje puerta */}
+      <div
+        className="mt-6 w-full max-w-xs overflow-hidden rounded-2xl"
+        style={{
+          background: "linear-gradient(135deg, rgba(180,140,50,0.18) 0%, rgba(180,140,50,0.06) 100%)",
+          border: "1px solid rgba(212,170,74,0.28)",
+        }}
+      >
+        <div className="px-5 py-5 text-center">
+          <div className="mb-4 flex items-center justify-center">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#d4aa4a]/15 ring-1 ring-[#d4aa4a]/25">
+              <Ticket size={16} className="text-[#d4aa4a]" />
+            </div>
+          </div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-white/35 mb-3">
+            Inscripciones cerradas
+          </p>
+          <p
+            className="text-xl font-bold text-white"
+            style={{ letterSpacing: "-0.02em" }}
+          >
+            ¡Te esperamos en puerta!
+          </p>
+          <p className="mt-2 text-sm leading-6 text-white/55">
+            Podés comprar tu entrada directamente en la entrada el día del evento.
+          </p>
+        </div>
+        <div
+          style={{
+            height: "1px",
+            background: "linear-gradient(90deg, transparent, rgba(212,170,74,0.22), transparent)",
+          }}
+        />
+        <div className="px-5 py-3 text-center">
+          <p className="text-xs text-white/35">
+            Viernes 19 de septiembre · 20 hs
+          </p>
+        </div>
+      </div>
+
+      <p className="mt-5 text-xs text-white/30">
+        Si tenés dudas, hablá con tu misionero.
+      </p>
+    </div>
+  );
 }
 
 // ─── Pantalla info ─────────────────────────────────────────────────────────────
@@ -170,6 +279,7 @@ export default function Home() {
   const [paso, setPaso] = useState<Paso>("info");
   const [misioneros, setMisioneros] = useState<string[]>([]);
   const [loadingMisioneros, setLoadingMisioneros] = useState(true);
+  const [formCerrado, setFormCerrado] = useState(() => new Date() >= CIERRE);
 
   const [misionero, setMisionero] = useState("");
   const [busqueda, setBusqueda] = useState("");
@@ -193,6 +303,14 @@ export default function Home() {
     asistencia === "todos" ? cantidad :
     asistencia === "ninguno" ? 0 :
     cantidadAsistentes;
+
+  useEffect(() => {
+    if (formCerrado) return;
+    const diff = CIERRE.getTime() - Date.now();
+    if (diff <= 0) { setFormCerrado(true); return; }
+    const id = setTimeout(() => setFormCerrado(true), diff);
+    return () => clearTimeout(id);
+  }, [formCerrado]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -351,13 +469,15 @@ export default function Home() {
 
       <section className="relative z-10 mx-auto flex min-h-screen max-w-lg flex-col justify-center px-5 py-12">
 
-        {paso === "info" && (
+        {formCerrado && <PantallaCerrada />}
+
+        {!formCerrado && paso === "info" && (
           <PantallaInfo onContinuar={() => setPaso("entradas")} />
         )}
 
-        {paso === "exito" && <PantallaExito onReiniciar={reiniciar} />}
+        {!formCerrado && paso === "exito" && <PantallaExito onReiniciar={reiniciar} />}
 
-        {(paso === "entradas" || paso === "nombres" || paso === "pago") && (
+        {!formCerrado && (paso === "entradas" || paso === "nombres" || paso === "pago") && (
           <>
             {/* Mini header encima del card */}
             <div className="mb-4 text-center">
